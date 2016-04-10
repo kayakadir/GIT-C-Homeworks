@@ -1,0 +1,410 @@
+/*############################################################################*/
+/*	HW08_Kadir_KAYA_121044045_part2.c										                      */
+/*-----------------------------												                        */
+/*	written by Kadir KAYA on April 20, 2015	  								                */
+/*																			                                      */
+/*	Description																                                */
+/*-----------------------------					   							                      */
+/*	6 fonksiyon bulunur.													                            */
+/*	Bir doktorun hastalarinin listesi ve randevu saatleri olan 2 txt dosyasi  */
+/*	vardir. People.txt ve Appointment_Reqs.txt								                */
+/*	Bu listelere bakarak doktorun randevu listesini olusturur				          */
+/*	Eger ayni tarihte 1 den fazla kisinin randevusu varsa 1 tanesi haric      */
+/*	digerleri iptal edilir.													                          */
+/*	Randevular tarihe gore siralanir ve Appointments.txt dosyasina yazilir.	  */
+/*############################################################################*/
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#define INFILE_PEOPLE "People.txt"
+#define INFILE_APPOINTMENT_REQ "Appointment_Reqs.txt"
+#define OUTFILE_APPOINTMENTS "Appointments.txt"
+#define MAX_SIZE 100
+#define TRUE 0
+#define FALSE 1
+#define FIRST_HALF 6
+#define SECOND_HALF 5
+
+typedef enum{MALE, FEMALE} Gender_t;
+
+typedef enum{JANUARY = 1, FEBRUARY, MARCH, APRIL, MAY, JUNE, JULY, AUGUST,
+			SEPTEMBER, OCTOBER, NOVEMBER, DECEMBER} Months_t;
+
+typedef struct{
+	int first_half;
+	int second_half;
+} TCId_no_t;
+
+typedef struct{
+	TCId_no_t id_no;
+	char name[30];
+	char surname[30];
+	Gender_t gender;
+} People_t;
+
+typedef struct{
+	int hour;
+	int minute;
+} Time_t;
+
+typedef struct{
+	int year;
+	Months_t month;
+	int day;
+	Time_t time;
+} Date_t;
+
+typedef struct{
+	People_t people;
+	Date_t date;
+} Appointment_t;
+
+
+
+/*Function Prototypes*/
+int get_people(const char *file_name, People_t people[], int max_size);
+int get_appointments(const char *file_name, Appointment_t appointments[], int max_size);
+void write_names(Appointment_t appointments[], int size_app, const People_t 
+people[], int size_people);
+int check_appointments(Appointment_t appointments[], int size);
+void sort_appointments(Appointment_t appointments[], int size);
+void write_appointments(const char *file_name, Appointment_t appointments[], int size);
+
+
+
+
+int main()
+{
+
+	People_t people[MAX_SIZE];
+	Appointment_t appointments[MAX_SIZE];
+	int size_people;
+	int size_appointments;
+
+	int i;
+
+	size_people = get_people(INFILE_PEOPLE, people, MAX_SIZE);
+
+	size_appointments = get_appointments(INFILE_APPOINTMENT_REQ,
+												appointments, MAX_SIZE);
+
+	write_names(appointments, size_appointments, people, size_people);
+
+	size_appointments = check_appointments(appointments, size_appointments);
+
+	sort_appointments(appointments, size_appointments);
+
+	write_appointments(OUTFILE_APPOINTMENTS, appointments, size_appointments);
+
+
+
+	return 0;
+}
+
+/*People.txt dosyasi fgets() ile okunur ve strtok() ile parcalanir.			  */
+/*Dosyada okudugu kisi sayisini return eder.								  */
+int get_people(const char *file_name, People_t people[], int max_size)
+{
+
+	FILE *in_people;
+	char line[MAX_SIZE];
+	char *id;
+	char *name;
+	char *surname;
+	char *gender;
+	int i = 0;
+	int record;
+	char id1[7], id2[6]; /*first_half ve second_halfin sonuna '\0' ekleyecegiz*/
+	int j, k;
+
+
+	in_people = fopen(file_name, "r");
+	if(in_people == NULL){
+		printf("People.txt dosyasi acilamadi!\n");
+		return FALSE;
+	}
+
+
+
+	while(fgets(line, MAX_SIZE, in_people) != NULL){
+
+		id = strtok(line, " ");
+		name = strtok(NULL, " ");
+		surname = strtok(NULL, " ");
+		gender = strtok(NULL, " \n");
+
+		strcpy(people[i].name, name);
+		strcpy(people[i].surname, surname);
+
+		if(strcmp(gender, "M") == 0)
+			people[i].gender = MALE;
+		else if(strcmp(gender, "F") == 0)
+			people[i].gender = FEMALE;
+
+		j = 0;
+		k = 0;
+		while(id[j] != '\0'){
+			if(j < 6)
+				id1[j] = id[j];
+			else{
+				id2[k] = id[j];
+				++k;
+			}
+			++j;
+		}
+
+		id1[6] = '\0';
+		id2[k] = '\0';
+
+		people[i].id_no.first_half = atoi(id1);
+		people[i].id_no.second_half = atoi(id2);
+
+		++i;
+	}
+	record = i;
+
+	fclose(in_people);
+
+	return record;
+}
+
+/*Appointments_Reqs.txt deki verileri fgets ile okur ve strtok ile ayirir.	  */
+/*Dosyada okudugu kisi sayisini return eder.								  */
+int get_appointments(const char *file_name, Appointment_t appointments[], int max_size)
+{
+
+
+	FILE *in_appointment;
+	char line[MAX_SIZE];
+	char *id;
+	char *year;
+	char *month;
+	char *day;
+	char *hour;
+	char *min;
+	char id1[7], id2[6];/*first_half ve second_halfin sonuna '\0' ekleyecegiz*/
+	int i = 0;
+	int j, k;
+	int record;
+
+	in_appointment = fopen(file_name, "r");
+	if(in_appointment == NULL){
+		printf("Appointment_Reqs.txt dosyasi acilamadi!\n");
+		return FALSE;
+	}
+
+
+	while(fgets(line, MAX_SIZE, in_appointment) != NULL){
+		id = strtok(line, " ");
+		year = strtok(NULL, " ");
+		month = strtok(NULL, " ");
+		day = strtok(NULL, " ");
+		hour = strtok(NULL, " :");
+		min = strtok(NULL, " \n");
+
+
+		j = 0;
+		k = 0;
+		while(id[j] != '\0'){
+			if(j < 6)
+				id1[j] = id[j];
+			else{
+				id2[k] = id[j];
+				++k;
+			}
+			++j;
+		}
+
+		id1[6] = '\0';
+		id2[k] = '\0';
+
+		appointments[i].people.id_no.first_half = atoi(id1);
+		appointments[i].people.id_no.second_half = atoi(id2);
+		appointments[i].date.year = atoi(year);
+		appointments[i].date.day = atoi(day);
+		appointments[i].date.time.hour = atoi(hour);
+		appointments[i].date.time.minute = atoi(min);
+
+		switch(atoi(month)){
+
+		case 1: appointments[i].date.month = JANUARY;
+			break;
+		case 2: appointments[i].date.month = FEBRUARY;
+			break;
+		case 3: appointments[i].date.month = MARCH;
+			break;
+		case 4: appointments[i].date.month = APRIL;
+			break;
+		case 5: appointments[i].date.month = MAY;
+			break;
+		case 6: appointments[i].date.month = JUNE;
+			break;
+		case 7: appointments[i].date.month = JULY;
+			break;
+		case 8: appointments[i].date.month = AUGUST;
+			break;
+		case 9: appointments[i].date.month = SEPTEMBER;
+			break;
+		case 10: appointments[i].date.month = OCTOBER;
+			break;
+		case 11: appointments[i].date.month = NOVEMBER;
+			break;
+		case 12: appointments[i].date.month = DECEMBER;
+			break;
+
+		default:
+			return -1;
+
+		}
+		++i;
+	}
+	record = i;
+
+	return record;
+}
+
+/*Appointment_t deki tcid_no People_t dekilerle karsilastirilip kisi isimleri */
+/*Appointment_t.people'a kaydedilir.										  */
+void write_names(Appointment_t appointments[], int size_app, const People_t people[], int size_people)
+{
+
+
+	int i, j;
+	int first, second;
+
+
+	for(i = 0; i < size_app; i++){
+		first = appointments[i].people.id_no.first_half;
+		second = appointments[i].people.id_no.second_half;
+
+		for(j = 0; j < size_people; j++){
+			if(first == people[j].id_no.first_half && second == people[j].id_no.second_half)
+				appointments[i].people = people[j];		
+		}
+
+	}
+
+}
+
+
+/*Appointment_t struct inda ayni tarihte randevu varsa ilk randevu haric	  */
+/*diger tekrar eden randevulari iptal eder.									  */
+/*yeni size i return eder.													  */
+int check_appointments(Appointment_t appointments[], int size)
+{
+
+	int i, j, k;
+	Appointment_t temp;
+
+	for(i = 0; i < size-1; i++){
+		for(j = i+1; j < size; j++){
+			if(appointments[i].date.time.minute == appointments[j].date.time.minute &&
+				appointments[i].date.time.hour == appointments[j].date.time.hour &&
+				appointments[i].date.day == appointments[j].date.day &&
+				appointments[i].date.month == appointments[j].date.month &&
+				appointments[i].date.year == appointments[j].date.year)
+			{
+
+				
+				temp = appointments[j];
+				appointments[j] = appointments[size-1];
+				appointments[size-1] = temp;
+
+				--size;
+				--j;
+			}
+		}
+	}
+
+
+	return size;
+
+}
+
+
+/*Appointments_t structindaki veriler tarihe gore kucukten buyuge siralanir.	  */
+void sort_appointments(Appointment_t appointments[], int size)
+{
+
+	Appointment_t temp;
+	int i, j;
+
+	for(i = 0; i < size-1; i++){
+		for(j = i+1; j < size; j++){
+			if(appointments[i].date.year > appointments[j].date.year){
+				temp = appointments[j];
+				appointments[j] = appointments[i];
+				appointments[i] = temp;
+			}
+			else if(appointments[i].date.year == appointments[j].date.year){
+				if(appointments[i].date.month > appointments[j].date.month){
+					temp = appointments[j];
+					appointments[j] = appointments[i];
+					appointments[i] = temp;
+				}
+				else if(appointments[i].date.month==appointments[j].date.month){
+					if(appointments[i].date.day > appointments[j].date.day){
+						temp = appointments[j];
+						appointments[j] = appointments[i];
+						appointments[i] = temp;
+					}
+					else if(appointments[i].date.day==appointments[j].date.day){
+						if(appointments[i].date.time.hour > appointments[j].date.time.hour){
+						temp = appointments[j];
+						appointments[j] = appointments[i];
+						appointments[i] = temp;
+						}
+						else if(appointments[i].date.time.hour==appointments[j].date.time.hour){
+							if(appointments[i].date.time.minute > appointments[j].date.time.minute){
+								temp = appointments[j];
+								appointments[j] = appointments[i];
+								appointments[i] = temp;
+							}
+
+						}
+
+					}
+
+				}
+
+			}
+
+		}
+
+	}
+
+}
+
+/*Appointments_t structindaki randevu bilgilerini appointments.txt output	  */
+/*dosyasina kaydeder.														  */
+void write_appointments(const char *file_name, Appointment_t appointments[], int size)
+{
+
+	FILE *fptr;
+	int i;
+
+	fptr = fopen(file_name,"w");
+	if(fptr == NULL)
+		printf("ERROR![Appointments.txt dosyasi acilamadi]\n");
+
+	for(i = 0; i < size; i++){
+
+		fprintf(fptr,"%d ", appointments[i].date.year);
+		fprintf(fptr,"%d ", appointments[i].date.month);
+		fprintf(fptr,"%d:", appointments[i].date.time.hour);
+		fprintf(fptr,"%d ", appointments[i].date.time.minute);
+		fprintf(fptr,"%d", appointments[i].people.id_no.first_half);
+		fprintf(fptr,"%d ", appointments[i].people.id_no.second_half);
+		fprintf(fptr,"%s ", appointments[i].people.name);
+		fprintf(fptr,"%s ", appointments[i].people.surname);
+		if(appointments[i].people.gender == 0)
+			fprintf(fptr,"M\n");
+		else
+			fprintf(fptr,"F\n");
+	}
+
+}
+/*############################################################################*/
+/*						End of HW8_Kadir_KAYA_121044045_part2.c			      */
+/*############################################################################*/
